@@ -1,0 +1,6 @@
+{
+  "name": "AgentBI - Multi-Agent Research & Business Intelligence Platform",
+  "description": "Enterprise-grade multi-agent autonomous research and business intelligence platform with AI agent orchestration, data analytics, ML forecasting, anomaly detection, customer segmentation, RAG, and executive reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

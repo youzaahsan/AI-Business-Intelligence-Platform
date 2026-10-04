@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agentbi_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus_bi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_bi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentbi_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentbi_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/nexus_bi
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: production-secret-key-change-this-now
+      LLM_PROVIDER: gemini
+      LLM_API_KEY: ${GEMINI_API_KEY}
+      APP_ENV: production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentbi_worker
+    restart: unless-stopped
+    command: celery -A app.tasks.worker worker --loglevel=info -c 4
+    environment:
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/nexus_bi
+      REDIS_URL: redis://redis:6379/0
+      LLM_PROVIDER: gemini
+      LLM_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    image: node:20-alpine
+    container_name: agentbi_frontend
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: sh -c "npm install && npm run build && npm run preview -- --port 3000 --host 0.0.0.0"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
